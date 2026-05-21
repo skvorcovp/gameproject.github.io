@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>FinRoute Pro: Настольный Симулятор</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            overflow: hidden;
+        }
+
+        #game-container {
+            width: 1050px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 25px;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            position: relative;
+            background: #dfe6e9;
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .tile {
+            background: white;
+            border: 2px solid #b2bec3;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            min-height: 90px;
+            box-sizing: border-box;
+            font-size: 11px;
+            font-weight: bold;
+            color: #2d3436;
+            position: relative;
+        }
+
+        .tile-num { font-size: 10px; color: #636e72; }
+        
+        .tile.start { background: #0984e3; color: white; }
+        .tile.finish { background: #2ecc71; color: white; }
+        .tile.chance { background: #fdcb6e; color: #2d3436; }
+        .tile.danger { background: #ff7675; color: white; }
+        .tile.operator { background: #9b59b6; color: white; }
+
+        #player {
+            width: 50px;
+            height: 50px;
+            background: rgba(225, 112, 85, 0.15);
+            border: 4px solid #e17055;
+            border-radius: 50%;
+            position: absolute;
+            transition: all 0.4s ease-in-out;
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(225, 112, 85, 0.6);
+            pointer-events: none;
+        }
+
+        #ui {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .balance-box {
+            font-size: 22px;
+            font-weight: bold;
+            color: #2d3436;
+            text-align: center;
+            background: #f1f2f6;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #0984e3;
+        }
+
+        #dice-btn {
+            background: #0984e3;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        #dice-btn:hover { background: #074b83; }
+        #dice-btn:disabled { background: #b2bec3; }
+
+        #log {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #2d3436;
+            height: 180px;
+            overflow-y: auto;
+            border-top: 1px solid #edf2f7;
+            padding-top: 10px;
+        }
+
+        #event-modal, #operator-modal, #start-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 100;
+            width: 420px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        #start-modal { display: block; }
+        #event-modal, #operator-modal { display: none; }
+
+        .chat-box {
+            background: #f5f6fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 14px;
+            border-left: 4px solid #9b59b6;
+        }
+
+        .modal-btn {
+            background: #0984e3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            text-align: left;
+        }
+        .modal-btn:hover { background: #074b83; }
+        
+        .start-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .start-btn:hover { background: #27ae60; }
+
+        .alert-box {
+            background: #ffeaa7;
+            border-left: 5px solid #fdcb6e;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #d63031;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+<audio id="step-sound" src="step.mp3" preload="auto"></audio>
+
+<div id="start-modal">
+    <h2 style="color: #0984e3; margin-top: 0;">🎯 Финансовая цель</h2>
+    <p style="font-size: 15px; color: #2d3436; line-height: 1.5;">
+        Добро пожаловать! Вы вышли на оживленный маршрут, где вас ждет много работы в поддержке банка.
+    </p>
+    <div class="alert-box">
+        Держите баланс строго выше 1000 рублей, иначе проиграете!
+    </div>
+    <button class="start-btn" onclick="startGame()">Начать игру</button>
+</div>
+
+<div id="game-container">
+    <div id="board">
+        <div id="player"></div>
+    </div>
+
+    <div id="ui">
+        <div class="balance-box">
+            Баланс карты:<br><span id="balance">1500</span> ₽
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <div id="dice-result" style="font-size: 46px; margin-bottom: 8px;">🎲</div>
+            <button id="dice-btn" onclick="rollDice()" disabled>Бросить кубик</button>
+        </div>
+
+        <div id="log"><b>Выписка по счету:</b><br></div>
+    </div>
+</div>
+
+<div id="event-modal">
+    <h2 id="modal-title">Событие</h2>
+    <p id="modal-text"></p>
+    <button style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer;" onclick="closeModal()">Принять операцию</button>
+</div>
+
+<div id="operator-modal">
+    <h2 style="color: #9b59b6; margin-top:0;">☎️ Вход в Поддержку Банка</h2>
+    <p style="font-size: 14px; color: #7f8c8d;">Экстренный чат от клиента!</p>
+    <div id="op-client" style="font-weight: bold; text-align: left;"></div>
+    <div id="op-question" class="chat-box"></div>
+    <div id="op-answers"></div>
+</div>
+
+<script>
+    let balance = 1500;
+    let currentPos = 0;
+    const tilesCount = 25;
+
+    // Сбалансированная карта: 12 полей поддержки банка (практически 50%)
+    const boardData = [
+        { title: "Старт", text: "Получена дебетовая карта.", money: 0, type: "start" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Подписка", text: "Списание за игровой сервис. Забыл отключить автопродление.", money: -150, type: "danger" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Кэшбэк", text: "Банк начислил кэшбэк за покупку учебников.", money: 120, type: "normal" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Фишинг", text: "Ввел данные карты на фейковом сайте со скинами.", money: -300, type: "danger" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Карта Шанс", text: "", money: 0, type: "chance" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Забывчивость", text: "Оставил карту в терминале фастфуда.", money: -200, type: "danger" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Карта Шанс", text: "", money: 0, type: "chance" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Донат", text: "Слишком увлекся покупкой внутриигровой валюты.", money: -250, type: "danger" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Копилка", text: "Накопительный счет принес проценты.", money: 200, type: "normal" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "QR-код скам", text: "Отсканировал фейковый QR-код на улице.", money: -350, type: "danger" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Перевод", text: "Родственники скинули подарок на карманные расходы.", money: 300, type: "normal" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Безопасность", text: "Поменял сложный пароль в онлайн-банке.", money: 100, type: "normal" },
+        { title: "Вход в чат", text: "Работа оператором!", money: 0, type: "operator" },
+        { title: "Финиш", text: "Маршрут закрыт! Ты успешно завершил финансовый маршрут.", money: 0, type: "finish" }
+    ];
+
+    const chanceCards = [
+        { title: "Секретный код", text: "Никому не сказал СМС-код из банка. Бонус за бдительность.", money: 300 },
+        { title: "Телефонный скам", text: "Поверил 'Службе безопасности' и продиктовал данные. Потеря средств.", money: -400 }
+    ];
+
+    // Расширенная база до 6 различных вопросов
+    const operatorQuestions = [
+        {
+            client: "Максим, 14 лет",
+            text: "Привет! Чувак просит скинуть только три цифры с задней стороны карты для покупки скина. Саму карту фоткать не надо. Так безопасно?",
+            options: [
+                { text: "Ни в коем случае! Три цифры (CVV) нельзя говорить никому, это ключ к твоим деньгам.", correct: true, penalty: 300 },
+                { text: "Да, без номера карты он ничего сделать не сможет.", correct: false, penalty: -250 }
+            ]
+        },
+        {
+            client: "Алина, 13 лет",
+            text: "Здравствуйте! Я потеряла карту на улице полчаса назад. Что мне делать? Бежать искать?",
+            options: [
+                { text: "Срочно зайди в приложение банка и заблокируй её, чтобы никто не успел потратить деньги.", correct: true, penalty: 300 },
+                { text: "Подожди до вечера, вдруг кто-то найдет и вернет.", correct: false, penalty: -200 }
+            ]
+        },
+        {
+            client: "Артем, 15 лет",
+            text: "Мне в телеграме предложили заработать: я должен принять на свою карту 5000 рублей от незнакомца, а потом перевести 4500 на другой номер. 500 рублей оставляю себе! Соглашаться?",
+            options: [
+                { text: "Нет, это схема дропперов. Тебя втянут в отмывание украденных денег, и банк заблокирует все счета.", correct: true, penalty: 300 },
+                { text: "Отличный легкий заработок, 500 рублей на дороге не валяются.", correct: false, penalty: -300 }
+            ]
+        },
+        {
+            client: "Светлана, 14 лет",
+            text: "В приложении банка вылезло уведомление: 'Обновите приложение по этой ссылке в чате'. Ссылка странная. Обновлять?",
+            options: [
+                { text: "Игнорируй ссылку. Официальные приложения обновляются только через официальные магазины (Rustore, AppGallery) или сайт банка.", correct: true, penalty: 250 },
+                { text: "Да, лучше обновить сразу, чтобы приложение не сломалось.", correct: false, penalty: -200 }
+            ]
+        },
+        {
+            client: "Иван, 15 лет",
+            text: "Привет. Друг предлагает установить на телефон приложение для удаленного доступа, чтобы он помог мне настроить игру. Это безопасно для мобильного банка?",
+            options: [
+                { text: "Опасно! Через приложения удаленного доступа мошенники могут зайти в твой банк и украсть все деньги.", correct: true, penalty: 350 },
+                { text: "Да, друг же не знает твой пароль от банка.", correct: false, penalty: -250 }
+            ]
+        },
+        {
+            client: "Кирилл, 13 лет",
+            text: "Пришло СМС: 'Вы выиграли 10 000 рублей в лотерее! Для получения перейдите по ссылке и оплатите комиссию 150 рублей'. Переводить комиссию?",
+            options: [
+                { text: "Это обман. Настоящие лотереи никогда не требуют предоплаты комиссии для выдачи приза.", correct: true, penalty: 200 },
+                { text: "Конечно, 150 рублей — мелкая плата за выигрыш в 10 тысяч.", correct: false, penalty: -150 }
+            ]
+        }
+    ];
+
+    let currentOpQuestion = 0;
+
+    const boardDiv = document.getElementById('board');
+    const playerDiv = document.getElementById('player');
+    const logDiv = document.getElementById('log');
+    const stepSound = document.getElementById('step-sound');
+
+    function createBoard() {
+        boardData.forEach((data, index) => {
+            const tile = document.createElement('div');
+            tile.className = `tile ${data.type}`;
+            tile.innerHTML = `<span class="tile-num">Клетка ${index + 1}</span><div>${data.title}</div>`;
+            tile.id = `tile-${index}`;
+            boardDiv.appendChild(tile);
+        });
+        setTimeout(() => movePlayer(0), 100);
+    }
+
+    function startGame() {
+        document.getElementById('start-modal').style.display = 'none';
+        document.getElementById('dice-btn').disabled = false;
+    }
+
+    function playStepSound() {
+        stepSound.currentTime = 0;
+        stepSound.play().catch(e => console.log("Ошибка звука:", e));
+    }
+
+    function movePlayer(index) {
+        const targetTile = document.getElementById(`tile-${index}`);
+        const tileWidth = targetTile.offsetWidth;
+        const tileHeight = targetTile.offsetHeight;
+        const playerWidth = playerDiv.offsetWidth;
+        const playerHeight = playerDiv.offsetHeight;
+
+        const leftPos = targetTile.offsetLeft + (tileWidth / 2) - (playerWidth / 2);
+        const topPos = targetTile.offsetTop + (tileHeight / 2) - (playerHeight / 2);
+
+        playerDiv.style.left = leftPos + 'px';
+        playerDiv.style.top = topPos + 'px';
+    }
+
+    function rollDice() {
+        document.getElementById('dice-btn').disabled = true;
+        const roll = Math.floor(Math.random() * 6) + 1;
+        document.getElementById('dice-result').innerText = "🎲 " + roll;
+
+        let steps = 0;
+        let interval = setInterval(() => {
+            currentPos++;
+            if (currentPos >= tilesCount) currentPos = tilesCount - 1;
+            
+            movePlayer(currentPos);
+            playStepSound();
+            
+            steps++;
+
+            if (steps >= roll || currentPos === tilesCount - 1) {
+                clearInterval(interval);
+                handleLanding(currentPos);
+            }
+        }, 400);
+    }
+
+    function handleLanding(index) {
+        let data = boardData[index];
+
+        if (data.type === "operator") {
+            launchOperatorGame();
+            return;
+        }
+
+        let isChance = data.type === "chance";
+        if (isChance) {
+            const randomIndex = Math.floor(Math.random() * chanceCards.length);
+            data = chanceCards[randomIndex];
+        }
+
+        balance += data.money;
+        document.getElementById('balance').innerText = balance;
+        
+        document.getElementById('modal-title').innerText = isChance ? `🎲 ШАНС: ${data.title}` : data.title;
+        document.getElementById('modal-text').innerText = data.text + (data.money !== 0 ? ` (${data.money} ₽)` : "");
+        document.getElementById('event-modal').style.display = 'block';
+
+        logDiv.innerHTML += `• Клетка ${index+1} [${data.title}]: ${data.money} ₽<br>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function launchOperatorGame() {
+        const q = operatorQuestions[currentOpQuestion];
+        document.getElementById('op-client').innerText = `Клиент: ${q.client}`;
+        document.getElementById('op-question').innerText = q.text;
+        
+        const answersDiv = document.getElementById('op-answers');
+        answersDiv.innerHTML = "";
+
+        q.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'modal-btn';
+            btn.innerText = opt.text;
+            btn.onclick = () => handleOperatorAnswer(opt);
+            answersDiv.appendChild(btn);
+        });
+
+        document.getElementById('operator-modal').style.display = 'block';
+    }
+
+    function handleOperatorAnswer(option) {
+        document.getElementById('operator-modal').style.display = 'none';
+        
+        balance += option.penalty;
+        document.getElementById('balance').innerText = balance;
+
+        document.getElementById('modal-title').innerText = option.correct ? "✅ Успешная консультация!" : "❌ Ошибка поддержки";
+        document.getElementById('modal-text').innerText = (option.correct ? "Вы помогли подростку уберечь деньги. Банк выдал премию!" : "Клиент потерял деньги из-за плохой подсказки. Банк штрафует вас.") + ` (${option.penalty} ₽)`;
+        document.getElementById('event-modal').style.display = 'block';
+
+        logDiv.innerHTML += `• Колл-центр [${option.correct ? 'Успех' : 'Провал'}]: ${option.penalty} ₽<br>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+
+        currentOpQuestion = (currentOpQuestion + 1) % operatorQuestions.length;
+    }
+
+    function closeModal() {
+        document.getElementById('event-modal').style.display = 'none';
+        const diceBtn = document.getElementById('dice-btn');
+
+        if (balance <= 1000) {
+            alert(`ИГРА ОКОНЧЕНА! Ваш баланс опустился до ${balance} ₽ (лимит 1000 ₽). Вы проиграли. Попробуйте еще раз!`);
+            location.reload();
+            return;
+        }
+
+        if (currentPos === tilesCount - 1) {
+            diceBtn.innerText = "Победа!";
+            alert(`Поздравляем! Ты дошел до финиша с балансом ${balance} ₽.`);
+        } else {
+            diceBtn.disabled = false;
+        }
+    }
+
+    createBoard();
+</script>
+
+</body>
+</html>
